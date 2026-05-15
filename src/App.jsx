@@ -11,14 +11,15 @@ const CO = {
   email: 'baeren_stark@hotmail.com',
   phone: '075 558 33 33',
   uid: 'CHE-459.842.475 MwSt.',
-  svcs: ['Transporte','Umzüge','Räumungen','Montagen','Reinigungen','Entsorgungen'],
+  svcs: ['Transporte', 'Umzüge', 'Räumungen', 'Montagen', 'Reinigungen', 'Entsorgungen'],
 }
 
-const LEISTUNGEN = ['Transport','Umzug','Räumung','Entsorgung','Montage','Reinigung','Sonstiges']
-const DOC_TYPEN = ['Rechnung','Auftragsbestätigung','Offerte']
-const ANREDEN = ['Herr','Frau','Firma']
-const ZAHLARTEN = ['Barzahlung','Kartenzahlung','Twint','Überweisung']
+const LEISTUNGEN = ['Transport', 'Umzug', 'Räumung', 'Entsorgung', 'Montage', 'Reinigung', 'Sonstiges']
+const DOC_TYPEN = ['Rechnung', 'Auftragsbestätigung', 'Offerte']
+const ANREDEN = ['Herr', 'Frau', 'Firma']
+const ZAHLARTEN = ['Barzahlung', 'Kartenzahlung', 'Twint', 'Überweisung']
 const VAT = 0.081
+const STUECK_LEISTUNGEN = ['Sonstiges']
 
 function genNr(type) {
   const y = new Date().getFullYear()
@@ -29,6 +30,13 @@ const heute = () => new Date().toISOString().split('T')[0]
 const fmtD = s => { try { return new Date(s).toLocaleDateString('de-CH') } catch { return s } }
 const fmtCHF = n => `CHF ${Number(n).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const emptyPos = () => ({ id: Date.now() + Math.random(), leistung: 'Transport', beschreibung: '', stunden: 2, ansatz: 80 })
+const monthKey = s => (s ? s.slice(0, 7) : '')
+const monthLabel = m => {
+  if (!m) return ''
+  const [y, mm] = m.split('-')
+  const names = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+  return `${names[Number(mm) - 1]} ${y}`
+}
 
 // ─── Invoice Form ─────────────────────────────────────────────────────────────
 function RechnungForm({ initial, onSave, onCancel }) {
@@ -51,14 +59,29 @@ function RechnungForm({ initial, onSave, onCancel }) {
   const mwst = netto * VAT
   const brutto = netto + mwst
 
+  const isStueck = pos => STUECK_LEISTUNGEN.includes(pos.leistung)
+  const qtyLabel = pos => isStueck(pos) ? 'Stück / Menge' : 'Stunden'
+  const rateLabel = pos => isStueck(pos) ? 'CHF / Stück' : 'CHF / Stunde'
+  const qtyPlaceholder = pos => isStueck(pos) ? 'z.B. 3' : 'z.B. 2.5'
+  const qtyStep = pos => isStueck(pos) ? '1' : '0.5'
+
+  const handleLeistungChange = (id, value) => {
+    const pos = positionen.find(p => p.id === id)
+    const newStunden = value === 'Sonstiges' ? 1 : (pos?.stunden ?? 2)
+    setPositionen(p => p.map(i => i.id === id ? { ...i, leistung: value, stunden: newStunden } : i))
+  }
+
   const handleSave = () => {
     if (!kunde.name.trim()) { alert('Bitte Kundenname eingeben.'); return }
-    onSave({ id: initial?.id || Date.now(), docTyp, nr, datum, anrede, kunde, positionen, zahlstatus, zahlart, netto, mwst, brutto, createdAt: initial?.createdAt || new Date().toISOString() })
+    onSave({
+      id: initial?.id || Date.now(),
+      docTyp, nr, datum, anrede, kunde, positionen, zahlstatus, zahlart, netto, mwst, brutto,
+      createdAt: initial?.createdAt || new Date().toISOString()
+    })
   }
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 0 40px' }}>
-      {/* Doc meta */}
       <div className="card">
         <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Dokumentdetails</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }} className="grid-3">
@@ -79,7 +102,6 @@ function RechnungForm({ initial, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* Customer */}
       <div className="card">
         <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Kunde / Empfänger</p>
         <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12, marginBottom: 12 }}>
@@ -91,28 +113,27 @@ function RechnungForm({ initial, onSave, onCancel }) {
           </div>
           <div>
             <label>Name / Firma</label>
-            <input placeholder="z.B. Mario Roos" value={kunde.name} onChange={e => uck('name', e.target.value)} />
+            <input placeholder="z.B. Vorname Nachname" value={kunde.name} onChange={e => uck('name', e.target.value)} />
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginBottom: 12 }}>
           <div>
             <label>Strasse & Nr.</label>
-            <input placeholder="Grünfeld 1" value={kunde.strasse} onChange={e => uck('strasse', e.target.value)} />
+            <input placeholder="Strasse & Nr." value={kunde.strasse} onChange={e => uck('strasse', e.target.value)} />
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 12 }}>
           <div>
             <label>PLZ</label>
-            <input placeholder="6208" value={kunde.plz} onChange={e => uck('plz', e.target.value)} />
+            <input placeholder="PLZ" value={kunde.plz} onChange={e => uck('plz', e.target.value)} />
           </div>
           <div>
             <label>Ort</label>
-            <input placeholder="Oberkirch" value={kunde.ort} onChange={e => uck('ort', e.target.value)} />
+            <input placeholder="Ort" value={kunde.ort} onChange={e => uck('ort', e.target.value)} />
           </div>
         </div>
       </div>
 
-      {/* Positions */}
       <div className="card">
         <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Positionen</p>
         {positionen.map((pos, idx) => (
@@ -124,7 +145,7 @@ function RechnungForm({ initial, onSave, onCancel }) {
             <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 10, marginBottom: 10 }}>
               <div>
                 <label>Leistungsart</label>
-                <select value={pos.leistung} onChange={e => ucp(pos.id, 'leistung', e.target.value)}>
+                <select value={pos.leistung} onChange={e => handleLeistungChange(pos.id, e.target.value)}>
                   {LEISTUNGEN.map(l => <option key={l}>{l}</option>)}
                 </select>
               </div>
@@ -140,11 +161,19 @@ function RechnungForm({ initial, onSave, onCancel }) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               <div>
-                <label>Stunden</label>
-                <input type="number" min="0.5" step="0.5" value={pos.stunden} onChange={e => ucp(pos.id, 'stunden', e.target.value)} style={{ textAlign: 'right' }} />
+                <label>{qtyLabel(pos)}</label>
+                <input
+                  type="number"
+                  min="0.5"
+                  step={qtyStep(pos)}
+                  value={pos.stunden}
+                  onChange={e => ucp(pos.id, 'stunden', e.target.value)}
+                  placeholder={qtyPlaceholder(pos)}
+                  style={{ textAlign: 'right' }}
+                />
               </div>
               <div>
-                <label>CHF / Stunde</label>
+                <label>{rateLabel(pos)}</label>
                 <input type="number" min="0" step="5" value={pos.ansatz} onChange={e => ucp(pos.id, 'ansatz', e.target.value)} style={{ textAlign: 'right' }} />
               </div>
               <div>
@@ -161,7 +190,6 @@ function RechnungForm({ initial, onSave, onCancel }) {
         </button>
       </div>
 
-      {/* Payment */}
       <div className="card">
         <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Zahlungsdetails</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -188,7 +216,6 @@ function RechnungForm({ initial, onSave, onCancel }) {
         )}
       </div>
 
-      {/* Totals */}
       <div className="card" style={{ maxWidth: 300, marginLeft: 'auto' }}>
         {[['Nettobetrag', netto], ['MwSt. 8.1 %', mwst]].map(([l, a]) => (
           <div key={l} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: '#6b7280' }}>
@@ -200,12 +227,9 @@ function RechnungForm({ initial, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* Actions */}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
         <button onClick={onCancel} style={{ padding: '10px 20px' }}>Abbrechen</button>
-        <button className="btn-primary" onClick={handleSave}>
-          {initial ? 'Aktualisieren' : 'Speichern'}
-        </button>
+        <button className="btn-primary" onClick={handleSave}>{initial ? 'Aktualisieren' : 'Speichern'}</button>
       </div>
     </div>
   )
@@ -216,7 +240,6 @@ function PrintView({ inv }) {
   const quittung = inv.zahlstatus === 'Bezahlt'
   return (
     <div id="print-area" style={{ background: 'white', maxWidth: 800, margin: '0 auto', padding: '40px', fontFamily: 'Arial, sans-serif', color: '#222' }}>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #1a2744', paddingBottom: 16, marginBottom: 24 }}>
         <div>
           <div style={{ marginBottom: 8 }}>
@@ -233,7 +256,6 @@ function PrintView({ inv }) {
         </div>
       </div>
 
-      {/* QUITTUNG banner */}
       {quittung && (
         <div style={{ background: '#dcfce7', border: '2px solid #16a34a', borderRadius: 10, padding: '12px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 24 }}>✅</span>
@@ -244,7 +266,6 @@ function PrintView({ inv }) {
         </div>
       )}
 
-      {/* Meta + Kunde */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
         <div style={{ fontSize: 12, lineHeight: 2, color: '#555' }}>
           {[['Datum', fmtD(inv.datum)], ['Ansprechpartner', CO.contact], ['E-Mail', CO.email], ['Telefon', CO.phone], ['Nummer', inv.nr]].map(([k, v]) => (
@@ -262,7 +283,6 @@ function PrintView({ inv }) {
         </div>
       </div>
 
-      {/* Title */}
       <p style={{ fontWeight: 800, fontSize: 16, borderBottom: '1px solid #ddd', paddingBottom: 6, marginBottom: 14 }}>
         {inv.docTyp} {quittung ? '/ Quittung' : ''}
       </p>
@@ -271,13 +291,14 @@ function PrintView({ inv }) {
         vielen Dank für Ihr Vertrauen. Wir freuen uns, den Auftrag ausgeführt zu haben.
       </p>
 
-      {/* Table */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 13 }}>
         <thead>
           <tr style={{ background: '#1a2744', color: 'white' }}>
-            {[['Pos', '40px', 'left'], ['Bezeichnung', 'auto', 'left'], ['Std.', '60px', 'right'], ['CHF/h', '90px', 'right'], ['Positionspreis', '120px', 'right']].map(([h, w, a]) => (
-              <th key={h} style={{ padding: '8px 10px', textAlign: a, fontWeight: 500, width: w, fontSize: 12 }}>{h}</th>
-            ))}
+            <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 500, width: '40px', fontSize: 12 }}>Pos</th>
+            <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 500, fontSize: 12 }}>Bezeichnung</th>
+            <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 500, width: '60px', fontSize: 12 }}>Std.</th>
+            <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 500, width: '90px', fontSize: 12 }}>CHF/h</th>
+            <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 500, width: '120px', fontSize: 12 }}>Positionspreis</th>
           </tr>
         </thead>
         <tbody>
@@ -298,7 +319,6 @@ function PrintView({ inv }) {
 
       <p style={{ fontSize: 11.5, color: '#666', marginBottom: 20 }}>Alle Preise inkl. 8.1% MwSt. in CHF.</p>
 
-      {/* Totals */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
         <div style={{ minWidth: 280, fontSize: 13 }}>
           {[['Nettobetrag (exkl. MwSt.)', inv.netto], ['MwSt. 8.1 %', inv.mwst]].map(([l, a]) => (
@@ -317,7 +337,6 @@ function PrintView({ inv }) {
         </div>
       </div>
 
-      {/* AGB */}
       <div style={{ borderTop: '1px solid #ddd', paddingTop: 14, fontSize: 11, color: '#666', lineHeight: 1.8 }}>
         <p style={{ fontWeight: 700, textDecoration: 'underline', marginBottom: 8, color: '#333' }}>Allgemein</p>
         <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: '2px 12px' }}>
@@ -330,7 +349,6 @@ function PrintView({ inv }) {
         </div>
       </div>
 
-      {/* Signature */}
       <div style={{ marginTop: 28, fontSize: 12, color: '#555' }}>
         <p>Für Rückfragen steht Ihnen {CO.contact} unter {CO.phone} gerne zur Verfügung.</p>
         <p style={{ margin: '14px 0 32px' }}>Wir bedanken uns für den Auftrag und freuen uns auf die weitere Zusammenarbeit.</p>
@@ -346,16 +364,37 @@ function PrintView({ inv }) {
 // ─── Overview / Dashboard ─────────────────────────────────────────────────────
 function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint }) {
   const [filter, setFilter] = useState('Alle')
+  const [filterMonat, setFilterMonat] = useState('Alle')
+
   const offen = rechnungen.filter(r => r.zahlstatus === 'Offen')
   const bezahlt = rechnungen.filter(r => r.zahlstatus === 'Bezahlt')
   const totalOffen = offen.reduce((s, r) => s + r.brutto, 0)
   const totalBezahlt = bezahlt.reduce((s, r) => s + r.brutto, 0)
 
-  const filtered = filter === 'Alle' ? rechnungen : rechnungen.filter(r => r.zahlstatus === filter)
+  const monate = Array.from(new Set(rechnungen.map(r => monthKey(r.datum)).filter(Boolean))).sort((a, b) => b.localeCompare(a))
+
+  const byStatus = filter === 'Alle' ? rechnungen : rechnungen.filter(r => r.zahlstatus === filter)
+  const filtered = filterMonat === 'Alle' ? byStatus : byStatus.filter(r => monthKey(r.datum) === filterMonat)
+
+  const monateSummen = filtered.reduce((acc, inv) => {
+    const key = monthKey(inv.datum)
+    if (!key) return acc
+    if (!acc[key]) acc[key] = { total: 0, paid: 0, offen: 0, methoden: {} }
+    acc[key].total += Number(inv.brutto) || 0
+    if (inv.zahlstatus === 'Bezahlt') {
+      acc[key].paid += Number(inv.brutto) || 0
+      acc[key].methoden[inv.zahlart] = (acc[key].methoden[inv.zahlart] || 0) + (Number(inv.brutto) || 0)
+    } else {
+      acc[key].offen += Number(inv.brutto) || 0
+    }
+    return acc
+  }, {})
+
+  const selectedMonth = filterMonat !== 'Alle' ? filterMonat : (monate[0] || null)
+  const selectedSummary = selectedMonth ? monateSummen[selectedMonth] : null
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
-      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 20 }}>
         {[
           ['Alle Dokumente', rechnungen.length, '#1a2744', '📄'],
@@ -370,12 +409,21 @@ function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint }) {
         ))}
       </div>
 
-      {/* Filter + New */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ flex: 1, display: 'flex', gap: 6 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ flex: 1, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {['Alle', 'Offen', 'Bezahlt'].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              style={{ background: filter === f ? '#1a2744' : 'white', color: filter === f ? 'white' : '#1a2744', border: '1px solid #1a2744', fontWeight: 500, padding: '7px 16px', fontSize: 13 }}>
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              style={{
+                background: filter === f ? '#1a2744' : 'white',
+                color: filter === f ? 'white' : '#1a2744',
+                border: '1px solid #1a2744',
+                fontWeight: 500,
+                padding: '7px 16px',
+                fontSize: 13
+              }}
+            >
               {f}
             </button>
           ))}
@@ -385,7 +433,34 @@ function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint }) {
         </button>
       </div>
 
-      {/* List */}
+      <div style={{ marginBottom: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
+        <div style={{ minWidth: 240 }}>
+          <label>Monat filtern</label>
+          <select value={filterMonat} onChange={e => setFilterMonat(e.target.value)}>
+            <option value="Alle">Alle Monate</option>
+            {monate.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+          </select>
+        </div>
+        {selectedSummary && (
+          <div className="card" style={{ margin: 0, padding: 14, flex: 1, minWidth: 260 }}>
+            <p style={{ margin: 0, fontWeight: 700, color: '#1a2744' }}>
+              Monatsbilanz: {selectedMonth === monthKey(new Date().toISOString()) ? 'Aktueller Monat' : monthLabel(selectedMonth)}
+            </p>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: '#6b7280' }}>
+              Total: {fmtCHF(selectedSummary.total)} · Bezahlt: {fmtCHF(selectedSummary.paid)} · Offen: {fmtCHF(selectedSummary.offen)}
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+              {Object.entries(selectedSummary.methoden).map(([m, sum]) => (
+                <div key={m} style={{ background: '#f8f9fc', border: '1px solid #e2e5ec', borderRadius: 8, padding: '8px 10px', minWidth: 120 }}>
+                  <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>{m}</p>
+                  <p style={{ margin: '2px 0 0', fontWeight: 700, color: '#1a2744' }}>{fmtCHF(sum)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {filtered.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
           <p style={{ fontSize: 40, marginBottom: 10 }}>📭</p>
@@ -394,7 +469,7 @@ function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint }) {
         </div>
       ) : (
         filtered.map(inv => (
-          <div key={inv.id} className="card" style={{ marginBottom: 10, padding: '14px 18px' }}>
+          <div key={inv.firestoreId} className="card" style={{ marginBottom: 10, padding: '14px 18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 180 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -428,15 +503,12 @@ function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint }) {
   )
 }
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState('overview')
   const [rechnungen, setRechnungen] = useState([])
   const [loading, setLoading] = useState(true)
   const [editInv, setEditInv] = useState(null)
-  const [printInv, setPrintInv] = useState(null)
 
-  // ── Realtime listener from Firestore ──
   useEffect(() => {
     const q = query(collection(db, 'rechnungen'), orderBy('createdAt', 'desc'))
     const unsub = onSnapshot(q, snap => {
@@ -449,12 +521,10 @@ export default function App() {
   const handleSave = async inv => {
     try {
       if (inv.firestoreId) {
-        // Update existing
         const ref = doc(db, 'rechnungen', inv.firestoreId)
         const { firestoreId, ...data } = inv
         await updateDoc(ref, { ...data, updatedAt: new Date().toISOString() })
       } else {
-        // New document
         await addDoc(collection(db, 'rechnungen'), {
           ...inv,
           createdAt: new Date().toISOString(),
@@ -468,7 +538,7 @@ export default function App() {
     }
   }
 
-  const handleDelete = async (firestoreId) => {
+  const handleDelete = async firestoreId => {
     try {
       await deleteDoc(doc(db, 'rechnungen', firestoreId))
     } catch (e) {
@@ -477,7 +547,6 @@ export default function App() {
   }
 
   const handlePrint = inv => {
-    // Build HTML in new window for reliable PDF/print
     const printHTML = `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -492,14 +561,11 @@ export default function App() {
     tr:nth-child(even) td { background: #fafafa; }
     .right { text-align: right; }
     .green-box { background: #dcfce7; border: 2px solid #16a34a; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
-    .total-row { font-weight: 700; font-size: 15px; color: #1a2744; border-top: 2px solid #1a2744; padding-top: 8px; }
-    .muted { color: #666; }
     .agb { font-size: 11px; color: #666; line-height: 1.7; border-top: 1px solid #ddd; padding-top: 14px; margin-top: 20px; }
     @media print { body { padding: 0; } }
   </style>
 </head>
 <body>
-  <!-- HEADER -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a2744;padding-bottom:16px;margin-bottom:24px;">
     <div>
       <img src="${window.location.origin}/logo_full.png" alt="Bärenstarker Transport GmbH" style="height:65px;width:auto;margin-bottom:6px;" />
@@ -520,7 +586,6 @@ export default function App() {
     <p style="font-size:12px;color:#166534;margin-top:4px;">Zahlungsart: ${inv.zahlart} · ${new Date(inv.datum).toLocaleDateString('de-CH')}</p>
   </div>` : ''}
 
-  <!-- META + KUNDE -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
     <div style="font-size:12px;color:#555;line-height:2;">
       <div style="display:flex;gap:8px;"><span style="font-weight:600;min-width:130px;color:#333;">Datum:</span><span>${new Date(inv.datum).toLocaleDateString('de-CH')}</span></div>
@@ -537,7 +602,6 @@ export default function App() {
     </div>
   </div>
 
-  <!-- TITLE -->
   <p style="font-weight:800;font-size:15px;border-bottom:1px solid #ddd;padding-bottom:6px;margin-bottom:14px;">
     ${inv.docTyp}${inv.zahlstatus === 'Bezahlt' ? ' / Quittung' : ''}
   </p>
@@ -546,7 +610,6 @@ export default function App() {
     vielen Dank für Ihr Vertrauen. Wir freuen uns, den Auftrag ausgeführt zu haben.
   </p>
 
-  <!-- TABLE -->
   <table style="margin-bottom:12px;">
     <thead>
       <tr>
@@ -570,15 +633,14 @@ export default function App() {
   </table>
   <p style="font-size:11.5px;color:#666;margin-bottom:20px;">Alle Preise inkl. 8.1% MwSt. in CHF.</p>
 
-  <!-- TOTALS -->
   <div style="display:flex;justify-content:flex-end;margin-bottom:24px;">
     <div style="min-width:280px;font-size:13px;">
       <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee;">
-        <span class="muted">Nettobetrag (exkl. MwSt.)</span>
+        <span style="color:#555;">Nettobetrag (exkl. MwSt.)</span>
         <span>CHF ${inv.netto.toLocaleString('de-CH', {minimumFractionDigits:2})}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee;">
-        <span class="muted">MwSt. 8.1 %</span>
+        <span style="color:#555;">MwSt. 8.1 %</span>
         <span>CHF ${inv.mwst.toLocaleString('de-CH', {minimumFractionDigits:2})}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:10px 0;font-weight:800;font-size:16px;color:#1a2744;border-top:2px solid #1a2744;margin-top:4px;">
@@ -592,24 +654,25 @@ export default function App() {
     </div>
   </div>
 
-  <!-- AGB -->
-  <div class="agb">
+  <div style="border-top:1px solid #ddd;padding-top:14px;font-size:11px;color:#666;line-height:1.8;">
     <p style="font-weight:700;text-decoration:underline;margin-bottom:8px;color:#333;">Allgemein</p>
-    <table style="font-size:11px;color:#666;">
-      <tr><td style="font-weight:600;color:#444;width:160px;padding:2px 12px 2px 0;border:none;">Zahlungskonditionen:</td><td style="border:none;">Barzahlung vor Ort nach Erledigung des Auftrags. Alle Preise zzgl. MwSt. 8.1%</td></tr>
-      <tr><td style="font-weight:600;color:#444;padding:2px 12px 2px 0;border:none;">Im Preis inbegriffen:</td><td style="border:none;">Betriebshaftpflichtversicherung (CHF 5'000'000.–), Transportversicherung (CHF 50'000.–), keine Benzin- oder Kilometerkosten, keine LSVA</td></tr>
-      <tr><td style="font-weight:600;color:#444;padding:2px 12px 2px 0;border:none;">Vertragsrücktritt:</td><td style="border:none;">30% ab 48h · 60% ab 14 Tage · 100% ab 7 Tage vor geplantem Einsatz</td></tr>
-    </table>
+    <div style="display:grid;grid-template-columns:160px 1fr;gap:2px 12px;">
+      <span style="font-weight:600;">Zahlungskonditionen:</span>
+      <span>Barzahlung vor Ort nach Erledigung des Auftrags. Alle Preise zzgl. MwSt. 8.1%</span>
+      <span style="font-weight:600;">Im Preis inbegriffen:</span>
+      <span>Betriebshaftpflichtversicherung (CHF 5'000'000.–), Transportversicherung (CHF 50'000.–), keine Benzin- oder Kilometerkosten, keine LSVA</span>
+      <span style="font-weight:600;">Vertragsrücktritt:</span>
+      <span>30% ab 48h · 60% ab 14 Tage · 100% ab 7 Tage vor geplantem Einsatz</span>
+    </div>
   </div>
 
-  <!-- SIGNATURE -->
   <div style="margin-top:28px;font-size:12px;color:#555;">
     <p>Für Rückfragen steht Ihnen Zef Mirakaj unter 075 558 33 33 gerne zur Verfügung.</p>
     <p style="margin:14px 0 32px;">Wir bedanken uns für den Auftrag und freuen uns auf die weitere Zusammenarbeit.</p>
     <p>Freundliche Grüsse</p>
     <p style="margin-top:24px;font-weight:700;font-size:13px;color:#1a2744;margin-bottom:2px;">Zef Mirakaj</p>
-    <p>Geschäftsführer</p>
-    <p style="font-style:italic;">Bärenstarker Transport GmbH</p>
+    <p style="margin:0;">Geschäftsführer</p>
+    <p style="margin:0;font-style:italic;">Bärenstarker Transport GmbH</p>
   </div>
 
   <script>window.onload = function(){ window.print(); }</script>
@@ -624,7 +687,6 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', background: '#f4f5f7' }}>
       <div id="app-shell">
-        {/* Top Nav */}
         <header style={{ background: '#1a2744', color: 'white', padding: '0 20px', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
           <div style={{ maxWidth: 800, margin: '0 auto', height: 56, display: 'flex', alignItems: 'center', gap: 12 }}>
             <img src="/logo.png" alt="Bärenstarker Transport GmbH" style={{ height: 36, width: 'auto', flexShrink: 0, filter: 'brightness(0) invert(1)' }} />
@@ -633,7 +695,7 @@ export default function App() {
               <p style={{ margin: 0, fontSize: 11, opacity: 0.65 }}>Rechnungs-Manager</p>
             </div>
             {screen !== 'overview' && (
-              <button onClick={() => { setScreen('overview'); setEditInv(null); setPrintInv(null) }}
+              <button onClick={() => { setScreen('overview'); setEditInv(null) }}
                 style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: 'none', padding: '7px 14px', fontSize: 13 }}>
                 ← Übersicht
               </button>
@@ -641,7 +703,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* Page Title */}
         <div style={{ background: 'white', borderBottom: '1px solid #e2e5ec', padding: '12px 20px' }}>
           <div style={{ maxWidth: 800, margin: '0 auto' }}>
             <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1a2744' }}>
@@ -652,7 +713,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Content */}
         <main style={{ padding: '20px 16px', maxWidth: 800, margin: '0 auto' }}>
           {loading ? (
             <div style={{ textAlign: 'center', padding: 60 }}>
