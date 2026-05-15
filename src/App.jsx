@@ -1,4 +1,3 @@
-from pathlib import Path
 p = Path('output/App.jsx')
 content = r'''import { useState, useEffect, useMemo } from 'react'
 import { db } from './firebase'
