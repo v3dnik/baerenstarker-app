@@ -1,5 +1,4 @@
-p = Path('output/App.jsx')
-content = r'''import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { db } from './firebase'
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore'
 
@@ -26,6 +25,7 @@ function genNr(type) {
   const p = type === 'Rechnung' ? 'RE' : type === 'Auftragsbestätigung' ? 'AB' : 'OF'
   return `${p}-${y}-${String(Math.floor(Math.random() * 900) + 100)}`
 }
+
 const heute = () => new Date().toISOString().split('T')[0]
 const fmtD = s => { try { return new Date(s).toLocaleDateString('de-CH') } catch { return s } }
 const fmtCHF = n => `CHF ${Number(n).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -173,7 +173,10 @@ function buildPrintHtml(inv) {
 }
 
 function buildMonthlySummaryHtml({ label, total, offen, bezahlt, methods }) {
-  const methodRows = Object.entries(methods || {}).map(([k, v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;"><span>${k}</span><span>${fmtCHF(v)}</span></div>`).join('') || '<p style="color:#9ca3af;">Ni podatkov za metode.</p>'
+  const methodRows = Object.entries(methods || {})
+    .map(([k, v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;"><span>${k}</span><span>${fmtCHF(v)}</span></div>`)
+    .join('') || '<p style="color:#9ca3af;">Ni podatkov za metode.</p>'
+
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -282,61 +285,162 @@ function RechnungForm({ initial, onSave, onCancel }) {
     })
   }
 
-  return <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 0 40px' }}>{/* same form as before */}
-    <div className="card"><p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Dokumentdetails</p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }} className="grid-3">
-        <div><label>Dokumenttyp</label><select value={docTyp} onChange={e => chgTyp(e.target.value)}>{DOC_TYPEN.map(d => <option key={d}>{d}</option>)}</select></div>
-        <div><label>Nummer</label><input value={nr} onChange={e => setNr(e.target.value)} /></div>
-        <div><label>Datum</label><input type="date" value={datum} onChange={e => setDatum(e.target.value)} /></div>
-      </div>
-    </div>
-
-    <div className="card"><p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Kunde / Empfänger</p>
-      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12, marginBottom: 12 }}>
-        <div><label>Anrede</label><select value={anrede} onChange={e => setAnrede(e.target.value)}>{ANREDEN.map(a => <option key={a}>{a}</option>)}</select></div>
-        <div><label>Name / Firma</label><input placeholder="Vorname Nachname" value={kunde.name} onChange={e => uck('name', e.target.value)} /></div>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginBottom: 12 }}><div><label>Strasse & Nr.</label><input placeholder="Strasse & Nr." value={kunde.strasse} onChange={e => uck('strasse', e.target.value)} /></div></div>
-      <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 12 }}>
-        <div><label>PLZ</label><input placeholder="PLZ" value={kunde.plz} onChange={e => uck('plz', e.target.value)} /></div>
-        <div><label>Ort</label><input placeholder="Ort" value={kunde.ort} onChange={e => uck('ort', e.target.value)} /></div>
-      </div>
-    </div>
-
-    <div className="card"><p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Positionen</p>
-      {positionen.map((pos, idx) => <div key={pos.id} style={{ background: '#f8f9fc', borderRadius: 8, padding: 14, marginBottom: 10, border: '1px solid #e8ebf0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}><span style={{ fontSize: 12, fontWeight: 600, color: '#1a2744' }}>Position {idx + 1}</span><button className="btn-danger" onClick={() => delPos(pos.id)} title="Entfernen">✕</button></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 10, marginBottom: 10 }}>
-          <div><label>Leistungsart</label><select value={pos.leistung} onChange={e => handleLeistungChange(pos.id, e.target.value)}>{LEISTUNGEN.map(l => <option key={l}>{l}</option>)}</select></div>
-          <div><label>{pos.leistung === 'Sonstiges' ? 'Beschreibung (Pflicht)' : 'Beschreibung (optional)'}</label><input placeholder={pos.leistung === 'Sonstiges' ? 'Was wurde gemacht?' : 'z.B. 2 Schränke, 3. OG ohne Lift…'} value={pos.beschreibung} onChange={e => ucp(pos.id, 'beschreibung', e.target.value)} style={{ borderColor: pos.leistung === 'Sonstiges' && !pos.beschreibung ? '#dc2626' : undefined }} /></div>
+  return (
+    <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 0 40px' }}>
+      <div className="card">
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Dokumentdetails</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }} className="grid-3">
+          <div>
+            <label>Dokumenttyp</label>
+            <select value={docTyp} onChange={e => chgTyp(e.target.value)}>
+              {DOC_TYPEN.map(d => <option key={d}>{d}</option>)}
+            </select>
+          </div>
+          <div>
+            <label>Nummer</label>
+            <input value={nr} onChange={e => setNr(e.target.value)} />
+          </div>
+          <div>
+            <label>Datum</label>
+            <input type="date" value={datum} onChange={e => setDatum(e.target.value)} />
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-          <div><label>{qtyLabel(pos)}</label><input type="number" min="0.5" step={qtyStep(pos)} value={pos.stunden} onChange={e => ucp(pos.id, 'stunden', e.target.value)} placeholder={qtyPlaceholder(pos)} style={{ textAlign: 'right' }} /></div>
-          <div><label>{rateLabel(pos)}</label><input type="number" min="0" step="5" value={pos.ansatz} onChange={e => ucp(pos.id, 'ansatz', e.target.value)} style={{ textAlign: 'right' }} /></div>
-          <div><label>Positionspreis</label><div style={{ padding: '9px 12px', background: 'white', border: '1px solid #e2e5ec', borderRadius: 6, fontWeight: 700, textAlign: 'right', fontSize: 14, color: '#1a2744' }}>{fmtCHF(Number(pos.stunden) * Number(pos.ansatz))}</div></div>
-        </div>
-      </div>)}
-      <button onClick={addPos} style={{ marginTop: 4, border: '1px dashed #c8a84b', color: '#c8a84b', background: 'transparent', width: '100%', padding: 10 }}>+ Position hinzufügen</button>
-    </div>
-
-    <div className="card"><p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Zahlungsdetails</p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div><label>Zahlungsstatus</label><select value={zahlstatus} onChange={e => setZahlstatus(e.target.value)} style={{ borderColor: zahlstatus === 'Bezahlt' ? '#16a34a' : '#d97706', color: zahlstatus === 'Bezahlt' ? '#16a34a' : '#d97706', fontWeight: 600 }}><option value="Offen">🟡 Offen</option><option value="Bezahlt">🟢 Bezahlt</option></select></div>
-        <div><label>Zahlungsart</label><select value={zahlart} onChange={e => setZahlart(e.target.value)} disabled={zahlstatus === 'Offen'} style={{ opacity: zahlstatus === 'Offen' ? 0.5 : 1 }}>{ZAHLARTEN.map(z => <option key={z}>{z}</option>)}</select></div>
       </div>
-      {zahlstatus === 'Bezahlt' && <div style={{ marginTop: 12, background: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>✓ Das PDF wird als Quittung mit «Betrag dankend erhalten» ausgestellt.</div>}
-    </div>
 
-    <div className="card" style={{ maxWidth: 300, marginLeft: 'auto' }}>
-      {[['Nettobetrag', netto], ['MwSt. 8.1 %', mwst]].map(([l, a]) => <div key={l} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: '#6b7280' }}><span>{l}</span><span style={{ color: '#1a2744' }}>{fmtCHF(a)}</span></div>)}
-      <div style={{ borderTop: '2px solid #1a2744', paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 16, color: '#1a2744' }}><span>Gesamtbetrag</span><span>{fmtCHF(brutto)}</span></div>
-    </div>
+      <div className="card">
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Kunde / Empfänger</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12, marginBottom: 12 }}>
+          <div>
+            <label>Anrede</label>
+            <select value={anrede} onChange={e => setAnrede(e.target.value)}>
+              {ANREDEN.map(a => <option key={a}>{a}</option>)}
+            </select>
+          </div>
+          <div>
+            <label>Name / Firma</label>
+            <input placeholder="Vorname Nachname" value={kunde.name} onChange={e => uck('name', e.target.value)} />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginBottom: 12 }}>
+          <div>
+            <label>Strasse & Nr.</label>
+            <input placeholder="Strasse & Nr." value={kunde.strasse} onChange={e => uck('strasse', e.target.value)} />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 12 }}>
+          <div>
+            <label>PLZ</label>
+            <input placeholder="PLZ" value={kunde.plz} onChange={e => uck('plz', e.target.value)} />
+          </div>
+          <div>
+            <label>Ort</label>
+            <input placeholder="Ort" value={kunde.ort} onChange={e => uck('ort', e.target.value)} />
+          </div>
+        </div>
+      </div>
 
-    <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}><button onClick={onCancel} style={{ padding: '10px 20px' }}>Abbrechen</button><button className="btn-primary" onClick={handleSave}>{initial ? 'Aktualisieren' : 'Speichern'}</button></div>
-  </div>
+      <div className="card">
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Positionen</p>
+        {positionen.map((pos, idx) => (
+          <div key={pos.id} style={{ background: '#f8f9fc', borderRadius: 8, padding: 14, marginBottom: 10, border: '1px solid #e8ebf0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#1a2744' }}>Position {idx + 1}</span>
+              <button className="btn-danger" onClick={() => delPos(pos.id)} title="Entfernen">✕</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 10, marginBottom: 10 }}>
+              <div>
+                <label>Leistungsart</label>
+                <select value={pos.leistung} onChange={e => handleLeistungChange(pos.id, e.target.value)}>
+                  {LEISTUNGEN.map(l => <option key={l}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <label>{pos.leistung === 'Sonstiges' ? 'Beschreibung (Pflicht)' : 'Beschreibung (optional)'}</label>
+                <input
+                  placeholder={pos.leistung === 'Sonstiges' ? 'Was wurde gemacht?' : 'z.B. 2 Schränke, 3. OG ohne Lift…'}
+                  value={pos.beschreibung}
+                  onChange={e => ucp(pos.id, 'beschreibung', e.target.value)}
+                  style={{ borderColor: pos.leistung === 'Sonstiges' && !pos.beschreibung ? '#dc2626' : undefined }}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div>
+                <label>{qtyLabel(pos)}</label>
+                <input
+                  type="number"
+                  min="0.5"
+                  step={qtyStep(pos)}
+                  value={pos.stunden}
+                  onChange={e => ucp(pos.id, 'stunden', e.target.value)}
+                  placeholder={qtyPlaceholder(pos)}
+                  style={{ textAlign: 'right' }}
+                />
+              </div>
+              <div>
+                <label>{rateLabel(pos)}</label>
+                <input type="number" min="0" step="5" value={pos.ansatz} onChange={e => ucp(pos.id, 'ansatz', e.target.value)} style={{ textAlign: 'right' }} />
+              </div>
+              <div>
+                <label>Positionspreis</label>
+                <div style={{ padding: '9px 12px', background: 'white', border: '1px solid #e2e5ec', borderRadius: 6, fontWeight: 700, textAlign: 'right', fontSize: 14, color: '#1a2744' }}>
+                  {fmtCHF(Number(pos.stunden) * Number(pos.ansatz))}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        <button onClick={addPos} style={{ marginTop: 4, border: '1px dashed #c8a84b', color: '#c8a84b', background: 'transparent', width: '100%', padding: 10 }}>
+          + Position hinzufügen
+        </button>
+      </div>
+
+      <div className="card">
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 14 }}>Zahlungsdetails</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label>Zahlungsstatus</label>
+            <select value={zahlstatus} onChange={e => setZahlstatus(e.target.value)}
+              style={{ borderColor: zahlstatus === 'Bezahlt' ? '#16a34a' : '#d97706', color: zahlstatus === 'Bezahlt' ? '#16a34a' : '#d97706', fontWeight: 600 }}>
+              <option value="Offen">🟡 Offen</option>
+              <option value="Bezahlt">🟢 Bezahlt</option>
+            </select>
+          </div>
+          <div>
+            <label>Zahlungsart</label>
+            <select value={zahlart} onChange={e => setZahlart(e.target.value)} disabled={zahlstatus === 'Offen'}
+              style={{ opacity: zahlstatus === 'Offen' ? 0.5 : 1 }}>
+              {ZAHLARTEN.map(z => <option key={z}>{z}</option>)}
+            </select>
+          </div>
+        </div>
+        {zahlstatus === 'Bezahlt' && (
+          <div style={{ marginTop: 12, background: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
+            ✓ Das PDF wird als Quittung mit «Betrag dankend erhalten» ausgestellt.
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ maxWidth: 300, marginLeft: 'auto' }}>
+        {[['Nettobetrag', netto], ['MwSt. 8.1 %', mwst]].map(([l, a]) => (
+          <div key={l} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: '#6b7280' }}>
+            <span>{l}</span><span style={{ color: '#1a2744' }}>{fmtCHF(a)}</span>
+          </div>
+        ))}
+        <div style={{ borderTop: '2px solid #1a2744', paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 16, color: '#1a2744' }}>
+          <span>Gesamtbetrag</span><span>{fmtCHF(brutto)}</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+        <button onClick={onCancel} style={{ padding: '10px 20px' }}>Abbrechen</button>
+        <button className="btn-primary" onClick={handleSave}>{initial ? 'Aktualisieren' : 'Speichern'}</button>
+      </div>
+    </div>
+  )
 }
 
-function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint, onPrintBilanz }) {
+function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint }) {
   const [filter, setFilter] = useState('Alle')
   const [filterMonat, setFilterMonat] = useState('Alle')
 
@@ -344,9 +448,11 @@ function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint, onPrintBilan
   const bezahlt = rechnungen.filter(r => r.zahlstatus === 'Bezahlt')
   const totalOffen = offen.reduce((s, r) => s + r.brutto, 0)
   const totalBezahlt = bezahlt.reduce((s, r) => s + r.brutto, 0)
+
   const monate = Array.from(new Set(rechnungen.map(r => monthKey(r.datum)).filter(Boolean))).sort((a, b) => b.localeCompare(a))
   const byStatus = filter === 'Alle' ? rechnungen : rechnungen.filter(r => r.zahlstatus === filter)
   const filtered = filterMonat === 'Alle' ? byStatus : byStatus.filter(r => monthKey(r.datum) === filterMonat)
+
   const selectedMonth = filterMonat !== 'Alle' ? filterMonat : (monate[0] || null)
 
   const selectedSummary = useMemo(() => {
@@ -389,11 +495,23 @@ function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint, onPrintBilan
           ['Alle Dokumente', rechnungen.length, '#1a2744', '📄'],
           ['Offen', `${offen.length} · ${fmtCHF(totalOffen)}`, '#d97706', '🟡'],
           ['Bezahlt', `${bezahlt.length} · ${fmtCHF(totalBezahlt)}`, '#16a34a', '🟢'],
-        ].map(([label, val, color, icon]) => <div key={label} className="card" style={{ textAlign: 'center', padding: 16 }}><div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div><p style={{ margin: 0, fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p><p style={{ margin: '4px 0 0', fontSize: 16, fontWeight: 700, color }}>{val}</p></div>)
+        ].map(([label, val, color, icon]) => (
+          <div key={label} className="card" style={{ textAlign: 'center', padding: 16 }}>
+            <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
+            <p style={{ margin: 0, fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+            <p style={{ margin: '4px 0 0', fontSize: 16, fontWeight: 700, color }}>{val}</p>
+          </div>
+        ))}
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ flex: 1, display: 'flex', gap: 6, flexWrap: 'wrap' }}>{['Alle', 'Offen', 'Bezahlt'].map(f => <button key={f} onClick={() => setFilter(f)} style={{ background: filter === f ? '#1a2744' : 'white', color: filter === f ? 'white' : '#1a2744', border: '1px solid #1a2744', fontWeight: 500, padding: '7px 16px', fontSize: 13 }}>{f}</button>)}</div>
+        <div style={{ flex: 1, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {['Alle', 'Offen', 'Bezahlt'].map(f => (
+            <button key={f} onClick={() => setFilter(f)} style={{ background: filter === f ? '#1a2744' : 'white', color: filter === f ? 'white' : '#1a2744', border: '1px solid #1a2744', fontWeight: 500, padding: '7px 16px', fontSize: 13 }}>
+              {f}
+            </button>
+          ))}
+        </div>
         <button className="btn-primary" onClick={onNeu} style={{ padding: '9px 20px', fontSize: 14 }}>+ Neue Rechnung</button>
       </div>
 
@@ -405,19 +523,69 @@ function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint, onPrintBilan
             {monate.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
           </select>
         </div>
-        {selectedSummary && <div className="card" style={{ margin: 0, padding: 14, flex: 1, minWidth: 260 }}>
-          <p style={{ margin: 0, fontWeight: 700, color: '#1a2744' }}>Monatsbilanz: {selectedSummary.label}</p>
-          <p style={{ margin: '6px 0 0', fontSize: 13, color: '#6b7280' }}>Total: {fmtCHF(selectedSummary.total)} · Bezahlt: {fmtCHF(selectedSummary.paid)} · Offen: {fmtCHF(selectedSummary.offen)}</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>{Object.entries(selectedSummary.methods).map(([m, sum]) => <div key={m} style={{ background: '#f8f9fc', border: '1px solid #e2e5ec', borderRadius: 8, padding: '8px 10px', minWidth: 120 }}><p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>{m}</p><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#1a2744' }}>{fmtCHF(sum)}</p></div>)}</div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-            <button className="btn-primary" onClick={() => shareSummary('print')}>🖨️ Monatsbilanz PDF / Print</button>
-            <button className="btn-primary" onClick={() => shareSummary('email')} style={{ background: '#0ea5e9' }}>📧 Monatsbilanz Email</button>
-            <button className="btn-primary" onClick={() => shareSummary('whatsapp')} style={{ background: '#16a34a' }}>📱 Monatsbilanz WhatsApp</button>
+
+        {selectedSummary && (
+          <div className="card" style={{ margin: 0, padding: 14, flex: 1, minWidth: 260 }}>
+            <p style={{ margin: 0, fontWeight: 700, color: '#1a2744' }}>Monatsbilanz: {selectedSummary.label}</p>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: '#6b7280' }}>
+              Total: {fmtCHF(selectedSummary.total)} · Bezahlt: {fmtCHF(selectedSummary.paid)} · Offen: {fmtCHF(selectedSummary.offen)}
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+              {Object.entries(selectedSummary.methods).map(([m, sum]) => (
+                <div key={m} style={{ background: '#f8f9fc', border: '1px solid #e2e5ec', borderRadius: 8, padding: '8px 10px', minWidth: 120 }}>
+                  <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>{m}</p>
+                  <p style={{ margin: '2px 0 0', fontWeight: 700, color: '#1a2744' }}>{fmtCHF(sum)}</p>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <button className="btn-primary" onClick={() => shareSummary('print')}>🖨️ Monatsbilanz PDF / Print</button>
+              <button className="btn-primary" onClick={() => shareSummary('email')} style={{ background: '#0ea5e9' }}>📧 Monatsbilanz Email</button>
+              <button className="btn-primary" onClick={() => shareSummary('whatsapp')} style={{ background: '#16a34a' }}>📱 Monatsbilanz WhatsApp</button>
+            </div>
           </div>
-        </div>}
+        )}
       </div>
 
-      {filtered.length === 0 ? <div className="card" style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}><p style={{ fontSize: 40, marginBottom: 10 }}>📭</p><p style={{ fontWeight: 600 }}>Keine Dokumente gefunden</p><p style={{ fontSize: 13, marginTop: 4 }}>Klicken Sie auf «Neue Rechnung» um zu beginnen.</p></div> : filtered.map(inv => <div key={inv.firestoreId} className="card" style={{ marginBottom: 10, padding: '14px 18px' }}><div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}><div style={{ flex: 1, minWidth: 180 }}><div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}><span style={{ fontWeight: 700, fontSize: 14 }}>{inv.kunde.name || '—'}</span><span className={`badge badge-${inv.zahlstatus === 'Bezahlt' ? 'paid' : 'open'}`}>{inv.zahlstatus === 'Bezahlt' ? '✓ Bezahlt' : '● Offen'}</span></div><p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>{inv.nr} · {fmtD(inv.datum)} · {inv.docTyp}{inv.zahlstatus === 'Bezahlt' && <span style={{ marginLeft: 6, color: '#16a34a' }}>· {inv.zahlart}</span>}</p><p style={{ margin: '3px 0 0', fontSize: 12, color: '#6b7280' }}>{inv.positionen.map(p => p.leistung).join(', ')}</p></div><div style={{ textAlign: 'right' }}><p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: '#1a2744' }}>{fmtCHF(inv.brutto)}</p><p style={{ margin: '2px 0 0', fontSize: 11, color: '#9ca3af' }}>inkl. MwSt.</p></div><div style={{ display: 'flex', gap: 6 }}><button onClick={() => onPrint(inv)} title="Drucken / PDF" style={{ padding: '7px 12px', fontSize: 13 }}>🖨️</button><button onClick={() => onEdit(inv)} title="Bearbeiten" style={{ padding: '7px 12px', fontSize: 13 }}>✏️</button><button className="btn-danger" onClick={() => onDelete(inv)} title="Löschen" style={{ padding: '7px 12px', fontSize: 13 }}>🗑️</button></div></div></div>)}
+      {filtered.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
+          <p style={{ fontSize: 40, marginBottom: 10 }}>📭</p>
+          <p style={{ fontWeight: 600 }}>Keine Dokumente gefunden</p>
+          <p style={{ fontSize: 13, marginTop: 4 }}>Klicken Sie auf «Neue Rechnung» um zu beginnen.</p>
+        </div>
+      ) : (
+        filtered.map(inv => (
+          <div key={inv.firestoreId} className="card" style={{ marginBottom: 10, padding: '14px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 180 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{inv.kunde.name || '—'}</span>
+                  <span className={`badge badge-${inv.zahlstatus === 'Bezahlt' ? 'paid' : 'open'}`}>
+                    {inv.zahlstatus === 'Bezahlt' ? '✓ Bezahlt' : '● Offen'}
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>
+                  {inv.nr} · {fmtD(inv.datum)} · {inv.docTyp}
+                  {inv.zahlstatus === 'Bezahlt' && <span style={{ marginLeft: 6, color: '#16a34a' }}>· {inv.zahlart}</span>}
+                </p>
+                <p style={{ margin: '3px 0 0', fontSize: 12, color: '#6b7280' }}>
+                  {inv.positionen.map(p => p.leistung).join(', ')}
+                </p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: '#1a2744' }}>{fmtCHF(inv.brutto)}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#9ca3af' }}>inkl. MwSt.</p>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => onPrint(inv)} title="Drucken / PDF" style={{ padding: '7px 12px', fontSize: 13 }}>🖨️</button>
+                <button onClick={() => onEdit(inv)} title="Bearbeiten" style={{ padding: '7px 12px', fontSize: 13 }}>✏️</button>
+                <button className="btn-danger" onClick={() => onDelete(inv)} title="Löschen" style={{ padding: '7px 12px', fontSize: 13 }}>🗑️</button>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   )
 }
@@ -444,7 +612,11 @@ export default function App() {
         const { firestoreId, ...data } = inv
         await updateDoc(ref, { ...data, updatedAt: new Date().toISOString() })
       } else {
-        await addDoc(collection(db, 'rechnungen'), { ...inv, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+        await addDoc(collection(db, 'rechnungen'), {
+          ...inv,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
       }
       setScreen('overview')
       setEditInv(null)
@@ -477,23 +649,50 @@ export default function App() {
               <p style={{ margin: 0, fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>Bärenstarker Transport</p>
               <p style={{ margin: 0, fontSize: 11, opacity: 0.65 }}>Rechnungs-Manager</p>
             </div>
-            {screen !== 'overview' && <button onClick={() => { setScreen('overview'); setEditInv(null) }} style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: 'none', padding: '7px 14px', fontSize: 13 }}>← Übersicht</button>}
+            {screen !== 'overview' && (
+              <button
+                onClick={() => { setScreen('overview'); setEditInv(null) }}
+                style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: 'none', padding: '7px 14px', fontSize: 13 }}
+              >
+                ← Übersicht
+              </button>
+            )}
           </div>
         </header>
 
         <div style={{ background: 'white', borderBottom: '1px solid #e2e5ec', padding: '12px 20px' }}>
           <div style={{ maxWidth: 800, margin: '0 auto' }}>
-            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1a2744' }}>{screen === 'overview' && '📋 Übersicht'}{screen === 'new' && '+ Neue Rechnung'}{screen === 'edit' && '✏️ Rechnung bearbeiten'}</h1>
+            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1a2744' }}>
+              {screen === 'overview' && '📋 Übersicht'}
+              {screen === 'new' && '+ Neue Rechnung'}
+              {screen === 'edit' && '✏️ Rechnung bearbeiten'}
+            </h1>
           </div>
         </div>
 
         <main style={{ padding: '20px 16px', maxWidth: 800, margin: '0 auto' }}>
-          {loading ? <div style={{ textAlign: 'center', padding: 60 }}><div style={{ fontSize: 40, marginBottom: 16 }}>🔄</div><p style={{ color: '#6b7280', fontWeight: 500 }}>Daten werden geladen…</p></div> : screen === 'overview' ? <Uebersicht rechnungen={rechnungen} onEdit={inv => { setEditInv(inv); setScreen('edit') }} onDelete={inv => { if (window.confirm('Wirklich löschen?')) handleDelete(inv.firestoreId) }} onNeu={() => { setEditInv(null); setScreen('new') }} onPrint={handlePrint} /> : (screen === 'new' || screen === 'edit') ? <RechnungForm initial={editInv} onSave={handleSave} onCancel={() => { setScreen('overview'); setEditInv(null) }} /> : null}
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 60 }}>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>🔄</div>
+              <p style={{ color: '#6b7280', fontWeight: 500 }}>Daten werden geladen…</p>
+            </div>
+          ) : screen === 'overview' ? (
+            <Uebersicht
+              rechnungen={rechnungen}
+              onEdit={inv => { setEditInv(inv); setScreen('edit') }}
+              onDelete={inv => { if (window.confirm('Wirklich löschen?')) handleDelete(inv.firestoreId) }}
+              onNeu={() => { setEditInv(null); setScreen('new') }}
+              onPrint={handlePrint}
+            />
+          ) : (screen === 'new' || screen === 'edit') ? (
+            <RechnungForm
+              initial={editInv}
+              onSave={handleSave}
+              onCancel={() => { setScreen('overview'); setEditInv(null) }}
+            />
+          ) : null}
         </main>
       </div>
     </div>
   )
 }
-'''
-p.write_text(content, encoding='utf-8')
-print(str(p))
