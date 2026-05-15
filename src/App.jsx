@@ -113,7 +113,7 @@ function RechnungForm({ initial, onSave, onCancel }) {
           </div>
           <div>
             <label>Name / Firma</label>
-            <input placeholder="z.B. Vorname Nachname" value={kunde.name} onChange={e => uck('name', e.target.value)} />
+            <input placeholder="Vorname Nachname" value={kunde.name} onChange={e => uck('name', e.target.value)} />
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginBottom: 12 }}>
