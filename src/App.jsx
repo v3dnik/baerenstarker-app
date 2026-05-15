@@ -1,15 +1,6 @@
 import { useState, useEffect } from 'react'
 import { db } from './firebase'
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  onSnapshot, 
-  query, 
-  orderBy 
-} from 'firebase/firestore'
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const CO = {
@@ -20,56 +11,24 @@ const CO = {
   email: 'baeren_stark@hotmail.com',
   phone: '075 558 33 33',
   uid: 'CHE-459.842.475 MwSt.',
-  svcs: [
-    'Transporte',
-    'Umzüge',
-    'Räumungen',
-    'Montagen',
-    'Reinigungen',
-    'Entsorgungen'
-  ],
+  svcs: ['Transporte','Umzüge','Räumungen','Montagen','Reinigungen','Entsorgungen'],
 }
 
-const LEISTUNGEN = [
-  'Transport',
-  'Umzug',
-  'Räumung',
-  'Entsorgung',
-  'Montage',
-  'Reinigung',
-  'Sonstiges'
-]
+const LEISTUNGEN = ['Transport','Umzug','Räumung','Entsorgung','Montage','Reinigung','Sonstiges']
 const DOC_TYPEN = ['Rechnung','Auftragsbestätigung','Offerte']
 const ANREDEN = ['Herr','Frau','Firma']
 const ZAHLARTEN = ['Barzahlung','Kartenzahlung','Twint','Überweisung']
 const VAT = 0.081
-const STUECK_LEISTUNGEN = ['Sonstiges'] // leistungen, die als Stück zählen
 
 function genNr(type) {
   const y = new Date().getFullYear()
   const p = type === 'Rechnung' ? 'RE' : type === 'Auftragsbestätigung' ? 'AB' : 'OF'
   return `${p}-${y}-${String(Math.floor(Math.random() * 900) + 100)}`
 }
-
 const heute = () => new Date().toISOString().split('T')[0]
-
-const fmtD = s => { 
-  try { 
-    return new Date(s).toLocaleDateString('de-CH') 
-  } catch { 
-    return s 
-  } 
-}
-
+const fmtD = s => { try { return new Date(s).toLocaleDateString('de-CH') } catch { return s } }
 const fmtCHF = n => `CHF ${Number(n).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-
-const emptyPos = (leistung = 'Transport') => ({ 
-  id: Date.now() + Math.random(), 
-  leistung, 
-  beschreibung: '', 
-  stunden: 2, 
-  ansatz: 80 
-})
+const emptyPos = () => ({ id: Date.now() + Math.random(), leistung: 'Transport', beschreibung: '', stunden: 2, ansatz: 80 })
 
 // ─── Invoice Form ─────────────────────────────────────────────────────────────
 function RechnungForm({ initial, onSave, onCancel }) {
@@ -84,7 +43,7 @@ function RechnungForm({ initial, onSave, onCancel }) {
 
   const uck = (f, v) => setKunde(c => ({ ...c, [f]: v }))
   const ucp = (id, f, v) => setPositionen(p => p.map(i => i.id === id ? { ...i, [f]: v } : i))
-  const addPos = () => setPositionen(p => [...p, emptyPos(positionen[0]?.leistung)])
+  const addPos = () => setPositionen(p => [...p, emptyPos()])
   const delPos = id => setPositionen(p => p.length > 1 ? p.filter(i => i.id !== id) : p)
   const chgTyp = t => { setDocTyp(t); setNr(genNr(t)) }
 
@@ -94,48 +53,7 @@ function RechnungForm({ initial, onSave, onCancel }) {
 
   const handleSave = () => {
     if (!kunde.name.trim()) { alert('Bitte Kundenname eingeben.'); return }
-    onSave({ 
-      id: initial?.id || Date.now(), 
-      docTyp, 
-      nr, 
-      datum, 
-      anrede, 
-      kunde, 
-      positionen, 
-      zahlstatus, 
-      zahlart, 
-      netto, 
-      mwst, 
-      brutto, 
-      createdAt: initial?.createdAt || new Date().toISOString() 
-    })
-  }
-
-  const getLabel = (pos) => {
-    const istStueck = STUECK_LEISTUNGEN.includes(pos.leistung)
-    return istStueck ? 'Menge (Stück/Pauschale)' : 'Stunden/Stück'
-  }
-
-  const getUnitLabel = (pos) => {
-    const istStueck = STUECK_LEISTUNGEN.includes(pos.leistung)
-    return istStueck ? 'CHF pro Stück' : 'CHF pro Stunde'
-  }
-
-  const getPlaceholder = (pos) => {
-    const istStueck = STUECK_LEISTUNGEN.includes(pos.leistung)
-    return istStueck ? 'z.B. 10 Stück' : 'z.B. 2.0 Stunden'
-  }
-
-  const handleChangeLeistung = (id, e) => {
-    const leistung = e.target.value
-    const istStueck = STUECK_LEISTUNGEN.includes(leistung)
-    const posToUpdate = positionen.find(p => p.id === id)
-    
-    // For Sonstiges, default to 1.0 as quantity (Stück), for others keep current Stunden
-    const neueStunden = istStueck ? 1.0 : (posToUpdate?.stunden || 2.0)
-    
-    ucp(id, 'leistung', leistung)
-    ucp(id, 'stunden', neueStunden)
+    onSave({ id: initial?.id || Date.now(), docTyp, nr, datum, anrede, kunde, positionen, zahlstatus, zahlart, netto, mwst, brutto, createdAt: initial?.createdAt || new Date().toISOString() })
   }
 
   return (
@@ -206,19 +124,14 @@ function RechnungForm({ initial, onSave, onCancel }) {
             <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 10, marginBottom: 10 }}>
               <div>
                 <label>Leistungsart</label>
-                <select 
-                  value={pos.leistung} 
-                  onChange={e => handleChangeLeistung(pos.id, e)}
-                >
+                <select value={pos.leistung} onChange={e => ucp(pos.id, 'leistung', e.target.value)}>
                   {LEISTUNGEN.map(l => <option key={l}>{l}</option>)}
                 </select>
               </div>
               <div>
-                <label>
-                  {pos.leistung === 'Sonstiges' ? 'Beschreibung (Pflicht)' : 'Beschreibung (optional)'}
-                </label>
+                <label>{pos.leistung === 'Sonstiges' ? 'Beschreibung (Pflicht)' : 'Beschreibung (optional)'}</label>
                 <input
-                  placeholder={pos.leistung === 'Sonstiges' ? 'Was wurde gemacht?' : 'z.B. 2 Schränke, 3. OG ohne Lift...'}
+                  placeholder={pos.leistung === 'Sonstiges' ? 'Was wurde gemacht?' : 'z.B. 2 Schränke, 3. OG ohne Lift…'}
                   value={pos.beschreibung}
                   onChange={e => ucp(pos.id, 'beschreibung', e.target.value)}
                   style={{ borderColor: pos.leistung === 'Sonstiges' && !pos.beschreibung ? '#dc2626' : undefined }}
@@ -227,27 +140,12 @@ function RechnungForm({ initial, onSave, onCancel }) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               <div>
-                <label>{getLabel(pos)}</label>
-                <input 
-                  type="number"
-                  min="0.5"
-                  step={STUECK_LEISTUNGEN.includes(pos.leistung) ? "1" : "0.5"}
-                  value={pos.stunden}
-                  placeholder={getPlaceholder(pos)}
-                  onChange={e => ucp(pos.id, 'stunden', e.target.value)}
-                  style={{ textAlign: 'right' }}
-                />
+                <label>Stunden</label>
+                <input type="number" min="0.5" step="0.5" value={pos.stunden} onChange={e => ucp(pos.id, 'stunden', e.target.value)} style={{ textAlign: 'right' }} />
               </div>
               <div>
-                <label>{getUnitLabel(pos)}</label>
-                <input 
-                  type="number"
-                  min="0"
-                  step="5"
-                  value={pos.ansatz}
-                  onChange={e => ucp(pos.id, 'ansatz', e.target.value)}
-                  style={{ textAlign: 'right' }}
-                />
+                <label>CHF / Stunde</label>
+                <input type="number" min="0" step="5" value={pos.ansatz} onChange={e => ucp(pos.id, 'ansatz', e.target.value)} style={{ textAlign: 'right' }} />
               </div>
               <div>
                 <label>Positionspreis</label>
@@ -269,27 +167,16 @@ function RechnungForm({ initial, onSave, onCancel }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
             <label>Zahlungsstatus</label>
-            <select 
-              value={zahlstatus} 
-              onChange={e => setZahlstatus(e.target.value)}
-              style={{ 
-                borderColor: zahlstatus === 'Bezahlt' ? '#16a34a' : '#d97706', 
-                color: zahlstatus === 'Bezahlt' ? '#16a34a' : '#d97706', 
-                fontWeight: 600 
-              }}
-            >
+            <select value={zahlstatus} onChange={e => setZahlstatus(e.target.value)}
+              style={{ borderColor: zahlstatus === 'Bezahlt' ? '#16a34a' : '#d97706', color: zahlstatus === 'Bezahlt' ? '#16a34a' : '#d97706', fontWeight: 600 }}>
               <option value="Offen">🟡 Offen</option>
               <option value="Bezahlt">🟢 Bezahlt</option>
             </select>
           </div>
           <div>
             <label>Zahlungsart</label>
-            <select 
-              value={zahlart} 
-              onChange={e => setZahlart(e.target.value)} 
-              disabled={zahlstatus === 'Offen'}
-              style={{ opacity: zahlstatus === 'Offen' ? 0.5 : 1 }}
-            >
+            <select value={zahlart} onChange={e => setZahlart(e.target.value)} disabled={zahlstatus === 'Offen'}
+              style={{ opacity: zahlstatus === 'Offen' ? 0.5 : 1 }}>
               {ZAHLARTEN.map(z => <option key={z}>{z}</option>)}
             </select>
           </div>
@@ -327,13 +214,6 @@ function RechnungForm({ initial, onSave, onCancel }) {
 // ─── Print/PDF View ───────────────────────────────────────────────────────────
 function PrintView({ inv }) {
   const quittung = inv.zahlstatus === 'Bezahlt'
-  const istStueckLeistung = (leistung) => STUECK_LEISTUNGEN.includes(leistung)
-  const getUnitLabelPrint = (leistung) => istStueckLeistung(leistung) ? 'Stück' : 'Std.'
-  const getRateLabelPrint = (leistung) => istStueckLeistung(leistung) ? 'CHF pro Stück' : 'CHF/h'
-  const getAmountLabelPrint = (leistung) => istStueckLeistung(leistung) ? 'Menge' : 'Std.'
-  const getQuantity = (pos) => pos.stunden
-  const getPrice = (pos) => Number(pos.stunden) * Number(pos.ansatz)
-
   return (
     <div id="print-area" style={{ background: 'white', maxWidth: 800, margin: '0 auto', padding: '40px', fontFamily: 'Arial, sans-serif', color: '#222' }}>
       {/* Header */}
@@ -395,7 +275,7 @@ function PrintView({ inv }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, fontSize: 13 }}>
         <thead>
           <tr style={{ background: '#1a2744', color: 'white' }}>
-            {[['Pos', '40px', 'left'], [getAmountLabelPrint(inv.positionen[0]?.leistung), '100px', 'right'], ['Bezeichnung', 'auto', 'left'], [getRateLabelPrint(inv.positionen[0]?.leistung), '100px', 'right'], ['Positionspreis', '120px', 'right']].map(([h, w, a]) => (
+            {[['Pos', '40px', 'left'], ['Bezeichnung', 'auto', 'left'], ['Std.', '60px', 'right'], ['CHF/h', '90px', 'right'], ['Positionspreis', '120px', 'right']].map(([h, w, a]) => (
               <th key={h} style={{ padding: '8px 10px', textAlign: a, fontWeight: 500, width: w, fontSize: 12 }}>{h}</th>
             ))}
           </tr>
@@ -404,13 +284,13 @@ function PrintView({ inv }) {
           {inv.positionen.map((pos, idx) => (
             <tr key={pos.id} style={{ borderBottom: '1px solid #eee', background: idx % 2 === 0 ? '#fafafa' : 'white' }}>
               <td style={{ padding: '8px 10px', color: '#888' }}>{idx + 1}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right' }}>{getQuantity(pos)}</td>
               <td style={{ padding: '8px 10px' }}>
                 <span style={{ fontWeight: 600 }}>{pos.leistung}</span>
                 {pos.beschreibung && <span style={{ color: '#555' }}> – {pos.beschreibung}</span>}
               </td>
+              <td style={{ padding: '8px 10px', textAlign: 'right' }}>{pos.stunden} h</td>
               <td style={{ padding: '8px 10px', textAlign: 'right' }}>{Number(pos.ansatz).toFixed(2)}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700 }}>{fmtCHF(getPrice(pos))}</td>
+              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700 }}>{fmtCHF(Number(pos.stunden) * Number(pos.ansatz))}</td>
             </tr>
           ))}
         </tbody>
@@ -466,52 +346,12 @@ function PrintView({ inv }) {
 // ─── Overview / Dashboard ─────────────────────────────────────────────────────
 function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint }) {
   const [filter, setFilter] = useState('Alle')
-  const [filterMonat, setFilterMonat] = useState('Alle')
-
   const offen = rechnungen.filter(r => r.zahlstatus === 'Offen')
   const bezahlt = rechnungen.filter(r => r.zahlstatus === 'Bezahlt')
   const totalOffen = offen.reduce((s, r) => s + r.brutto, 0)
   const totalBezahlt = bezahlt.reduce((s, r) => s + r.brutto, 0)
 
-  // Pomembno: pretvori datum v `YYYY-MM`
-  const byMonat = (r) => r.datum.split('-').slice(0, 2).join('-')
-
-  const filteredByStatus = filter === 'Alle'
-    ? rechnungen
-    : rechnungen.filter(r => r.zahlstatus === filter)
-
-  const filtered = filterMonat === 'Alle'
-    ? filteredByStatus
-    : filteredByStatus.filter(r => byMonat(r) === filterMonat)
-
-  // seznam vseh unikatnih `YYYY-MM` (urejeno od zadnjega naprej)
-  const monateList = Array.from(new Set(rechnungen.map(byMonat)))
-    .sort((a, b) => b.localeCompare(a))
-
-  const mts = [
-    'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 
-    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'
-  ]
-
-  const formatMonat = (m) => {
-    const [y, mm] = m.split('-')
-    return `${mts[Number(mm) - 1]} ${y}`
-  }
-
-  // Monthly summary totals
-  const monthlyTotals = filtered.reduce((acc, r) => {
-    const monat = byMonat(r)
-    if (!acc[monat]) {
-      acc[monat] = { brutto: 0, zahzahlungen: { Barzahlung: 0, Kartenzahlung: 0, Twint: 0, Überweisung: 0 } }
-    }
-    acc[monat].brutto += r.brutto
-    if (r.zahlstatus === 'Bezahlt' && ZAHLARTEN.includes(r.zahlart)) {
-      acc[monat].zahzahlungen[r.zahlart] += r.brutto
-    }
-    return acc
-  }, {})
-
-  const currentMonat = filterMonat !== 'Alle' ? filterMonat : byMonat(new Date())
+  const filtered = filter === 'Alle' ? rechnungen : rechnungen.filter(r => r.zahlstatus === filter)
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
@@ -534,7 +374,7 @@ function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint }) {
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ flex: 1, display: 'flex', gap: 6 }}>
           {['Alle', 'Offen', 'Bezahlt'].map(f => (
-            <button key={f} onClick={() => { setFilter(f); setFilterMonat('Alle') }}
+            <button key={f} onClick={() => setFilter(f)}
               style={{ background: filter === f ? '#1a2744' : 'white', color: filter === f ? 'white' : '#1a2744', border: '1px solid #1a2744', fontWeight: 500, padding: '7px 16px', fontSize: 13 }}>
               {f}
             </button>
@@ -545,51 +385,6 @@ function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint }) {
         </button>
       </div>
 
-      {/* Filter po mesecu */}
-      <div style={{ marginBottom: 14 }}>
-        <select 
-          value={filterMonat} 
-          onChange={e => setFilterMonat(e.target.value)} 
-          style={{ padding: '6px 12px', fontSize: 13, width: '220px' }}
-        >
-          <option value="Alle">Alle Monate</option>
-          {monateList.map(m => (
-            <option key={m} value={m}>{formatMonat(m)}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Monthly Summary Card */}
-      {filterMonat !== 'Alle' && monthlyTotals[currentMonat] && (
-        <div className="card" style={{ marginBottom: 16, padding: '16px 20px', background: '#f8f9fc' }}>
-          <p style={{ fontSize: 14, fontWeight: 700, color: '#1a2744', marginBottom: 12 }}>
-            Monatsbilanz {formatMonat(currentMonat)}
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div>
-              <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>Total: {fmtCHF(monthlyTotals[currentMonat].brutto)}</p>
-            </div>
-          </div>
-          <p style={{ fontSize: 12, color: '#555', margin: '12px 0 8px', fontWeight: 600 }}>Zahlungsmethoden im Monat:</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            {ZAHLARTEN.map(z => {
-              const sum = monthlyTotals[currentMonat].zahzahlungen[z] || 0
-              if (sum === 0) return null
-              const color = z === 'Barzahlung' ? '#3b82f6' : z === 'Kartenzahlung' ? '#059669' : z === 'Twint' ? '#0b57d0' : '#ea580c'
-              return (
-                <div key={z} style={{ padding: '10px 14px', background: 'white', border: '1px solid #e2e5ec', borderRadius: 8, minWidth: '140px', textAlign: 'center' }}>
-                  <p style={{ margin: 0, fontSize: 12, color: '#555' }}>{z}</p>
-                  <p style={{ margin: '4px 0 0', fontSize: 14, fontWeight: 700, color }}>{fmtCHF(sum)}</p>
-                </div>
-              )
-            })}
-          </div>
-          <p style={{ fontSize: 11, color: '#6b7280', margin: '12px 0 0', fontStyle: 'italic' }}>
-            Diese Zusammenfassung zeigt alle Rechnungen des Monats und die Zahlungsmethoden der bezahlten Rechnungen.
-          </p>
-        </div>
-      )}
-
       {/* List */}
       {filtered.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
@@ -599,7 +394,7 @@ function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint }) {
         </div>
       ) : (
         filtered.map(inv => (
-          <div key={inv.firestoreId} className="card" style={{ marginBottom: 10, padding: '14px 18px' }}>
+          <div key={inv.id} className="card" style={{ marginBottom: 10, padding: '14px 18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 180 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -633,7 +428,7 @@ function Uebersicht({ rechnungen, onEdit, onDelete, onNeu, onPrint }) {
   )
 }
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+// ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState('overview')
   const [rechnungen, setRechnungen] = useState([])
@@ -698,7 +493,7 @@ export default function App() {
     .right { text-align: right; }
     .green-box { background: #dcfce7; border: 2px solid #16a34a; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
     .total-row { font-weight: 700; font-size: 15px; color: #1a2744; border-top: 2px solid #1a2744; padding-top: 8px; }
-    .muted { color: '#666'; }
+    .muted { color: #666; }
     .agb { font-size: 11px; color: #666; line-height: 1.7; border-top: 1px solid #ddd; padding-top: 14px; margin-top: 20px; }
     @media print { body { padding: 0; } }
   </style>
@@ -757,8 +552,8 @@ export default function App() {
       <tr>
         <th style="width:40px;">Pos</th>
         <th>Bezeichnung</th>
-        <th class="right" style="width:100px;">${getAmountLabelPrint(inv.positionen[0]?.leistung)}</th>
-        <th class="right" style="width:100px;">${getRateLabelPrint(inv.positionen[0]?.leistung)}</th>
+        <th class="right" style="width:60px;">Std.</th>
+        <th class="right" style="width:90px;">CHF/h</th>
         <th class="right" style="width:120px;">Positionspreis</th>
       </tr>
     </thead>
@@ -767,7 +562,7 @@ export default function App() {
       <tr>
         <td style="color:#888;">${idx + 1}</td>
         <td><strong>${pos.leistung}</strong>${pos.beschreibung ? ' – ' + pos.beschreibung : ''}</td>
-        <td class="right">${getQuantity(pos)}</td>
+        <td class="right">${pos.stunden} h</td>
         <td class="right">${Number(pos.ansatz).toFixed(2)}</td>
         <td class="right" style="font-weight:700;">CHF ${(Number(pos.stunden) * Number(pos.ansatz)).toLocaleString('de-CH', {minimumFractionDigits:2})}</td>
       </tr>`).join('')}
